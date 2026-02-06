@@ -1,19 +1,31 @@
 // Content script for Teams Transcript Downloader
-// SIMPLIFIED v2: Better parsing, single scroll
+// SIMPLIFIED v2: Better parsing, single scroll, stoppable
 
 (function () {
     'use strict';
 
+    let isExtracting = false;
+    let shouldStop = false;
+
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (request.action === 'extractTranscript') {
+            shouldStop = false;
             extractWithSingleScroll()
                 .then(transcript => sendResponse(transcript))
                 .catch(error => {
                     console.error('Extraction error:', error);
                     sendResponse({ error: error.message, entries: [] });
                 });
+            return true; // Keep channel open for async
+        }
+
+        if (request.action === 'stopExtraction') {
+            console.log('Stopping extraction...');
+            shouldStop = true;
+            // Response will be handled by the main promise resolving with partial data
             return true;
         }
+
         return true;
     });
 
@@ -51,9 +63,13 @@
     }
 
     async function extractWithSingleScroll() {
+        if (isExtracting) return { error: 'Ya hay una extracción en curso' };
+        isExtracting = true;
+
         const container = findTranscriptContainer();
 
         if (!container) {
+            isExtracting = false;
             console.log('No scrollable container found');
             return extractVisibleOnly();
         }
@@ -75,6 +91,11 @@
 
         // Single scroll pass
         while (stuckCount < 3) {
+            if (shouldStop) {
+                console.log('Extraction stopped by user');
+                break;
+            }
+
             // Capture
             captureOrder = captureVisible(capturedItems, captureOrder);
 
@@ -95,6 +116,9 @@
         }
 
         console.log(`Captured ${capturedItems.size} items`);
+        isExtracting = false;
+
+        // Even if stopped, return what we found so far
         return buildResult(capturedItems);
     }
 
@@ -158,15 +182,7 @@
 
         const text = rawText.trim();
 
-        // Debug first 3 headers to see exact format
-        if (!window._headerDebugCount) window._headerDebugCount = 0;
-        if (window._headerDebugCount < 5) {
-            console.log('HEADER #' + window._headerDebugCount + ':', JSON.stringify(text));
-            window._headerDebugCount++;
-        }
-
         // TIMESTAMP: It's at the very END of the text, format "X:XX" (4-5 chars)
-        // Extract the last 5 characters and look for the pattern there
         const lastChars = text.slice(-5);
         const endMatch = lastChars.match(/(\d{1,2}:\d{2})$/);
         if (endMatch) {
@@ -181,33 +197,22 @@
         }
 
         // SPEAKER: Get the text that contains "|"
-        // Format seems to be "Name | Company" followed by time info
         const pipeIndex = text.indexOf('|');
         if (pipeIndex > 0) {
-            // Find where the name part ends
-            // Look for the part with "|" and take a reasonable chunk
             const afterPipe = text.substring(pipeIndex + 1);
-
-            // Find where company name ends (before digit that starts time)
             const companyMatch = afterPipe.match(/^([^0-9]+)/);
             const company = companyMatch ? companyMatch[1].trim() : '';
-
             const beforePipe = text.substring(0, pipeIndex).trim();
-
             result.speaker = beforePipe + ' | ' + company;
         } else {
-            // No pipe, try to get name before any digits
             const nameMatch = text.match(/^([^0-9]+)/);
             if (nameMatch) {
                 result.speaker = nameMatch[1].trim();
             }
         }
 
-        // Clean up speaker
         if (result.speaker) {
-            // Remove trailing pipe if any
             result.speaker = result.speaker.replace(/\s*\|\s*$/, '').trim();
-            // Remove common artifacts
             result.speaker = result.speaker.replace(/\s+/g, ' ').trim();
         }
 
@@ -232,7 +237,6 @@
             }
         }
 
-        // Sort by capture order
         const sortedItems = Array.from(capturedItems.values()).sort((a, b) => a.order - b.order);
 
         const speakersSet = new Set();
@@ -241,9 +245,7 @@
         let currentTexts = [];
 
         sortedItems.forEach((item) => {
-            // New speaker block if this item has a speaker
             if (item.speaker) {
-                // Save previous block
                 if (currentTexts.length > 0) {
                     result.entries.push({
                         index: result.entries.length + 1,
@@ -266,7 +268,6 @@
             }
         });
 
-        // Last block
         if (currentTexts.length > 0) {
             result.entries.push({
                 index: result.entries.length + 1,
@@ -316,5 +317,5 @@
         return result;
     }
 
-    console.log('Teams Transcript Downloader v2 loaded');
+    console.log('Teams Transcript Downloader v2.1 loaded');
 })();
