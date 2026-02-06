@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Teams Transcript Downloader",
+  "description": "Descarga transcripciones de Microsoft Stream/SharePoint en formato JSON",
+  "version": "1.0.0",
+  "author": "Chrome Teams Extension",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.sharepoint.com/*",
+    "*://*.microsoft.com/*",
+    "*://*.teams.microsoft.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Descargar Transcripción"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.sharepoint.com/*",
+        "*://*.microsoft.com/*",
+        "*://*.teams.microsoft.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

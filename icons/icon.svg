@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d9ff"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+    <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#e0e0e0"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#bgGrad)"/>
+  
+  <!-- Document icon -->
+  <path d="M40 25 L75 25 L90 40 L90 103 L40 103 Z" fill="url(#iconGrad)" stroke="#ffffff" stroke-width="2"/>
+  <path d="M75 25 L75 40 L90 40" fill="none" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Text lines -->
+  <line x1="50" y1="55" x2="80" y2="55" stroke="#00d9ff" stroke-width="4" stroke-linecap="round"/>
+  <line x1="50" y1="68" x2="75" y2="68" stroke="#a855f7" stroke-width="4" stroke-linecap="round"/>
+  <line x1="50" y1="81" x2="70" y2="81" stroke="#00d9ff" stroke-width="4" stroke-linecap="round"/>
+  
+  <!-- Download arrow -->
+  <circle cx="85" cy="88" r="18" fill="#1a1a2e"/>
+  <path d="M85 78 L85 95 M78 88 L85 95 L92 88" stroke="#00d9ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
