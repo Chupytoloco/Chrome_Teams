@@ -3,7 +3,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const extractBtn = document.getElementById('extractBtn');
     const stopBtn = document.getElementById('stopBtn');
-    const projectNameInput = document.getElementById('projectName');
     const statusContainer = document.getElementById('statusContainer');
     const statusMessage = document.getElementById('statusMessage');
     const statsContainer = document.getElementById('statsContainer');
@@ -13,18 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let processing = false;
 
-    // Load saved project name
-    chrome.storage.local.get(['lastProjectName'], (result) => {
-        if (result.lastProjectName) {
-            projectNameInput.value = result.lastProjectName;
-        }
-    });
-
     extractBtn.addEventListener('click', async () => {
         if (processing) return;
-
-        const projectName = projectNameInput.value.trim() || 'PROYECTO';
-        chrome.storage.local.set({ lastProjectName: projectName });
 
         startProcessing();
 
@@ -37,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Send extract message
             const response = await chrome.tabs.sendMessage(tab.id, { action: 'extractTranscript' });
 
-            handleResponse(response, projectName);
+            handleResponse(response);
 
         } catch (error) {
             console.error('Error:', error);
@@ -50,15 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (tab) {
-                // Send stop message - the content script should return what it has collected so far
-                const response = await chrome.tabs.sendMessage(tab.id, { action: 'stopExtraction' });
-                // We'll handle the partial data in the response of the original request, 
-                // but just in case the content script returns directly to this call:
-                if (response && response.entries) {
-                    // Usually the original promise will resolve, so we might not need to do anything here
-                    // But setting status is good
-                    setStatus('loading', 'Deteniendo... procesando datos capturados.');
-                }
+                // Send stop message
+                await chrome.tabs.sendMessage(tab.id, { action: 'stopExtraction' });
+                setStatus('loading', 'Deteniendo... procesando datos capturados.');
             }
         } catch (error) {
             console.error('Error stopping:', error);
@@ -88,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    function handleResponse(response, projectName) {
+    function handleResponse(response) {
         if (!response || !response.entries || response.entries.length === 0) {
             if (response && response.error) {
                 throw new Error(response.error);
@@ -98,14 +81,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateStats(response);
 
-        const filename = generateFilename(projectName);
+        // Use meeting title or default
+        const meetingTitle = response.title || 'Transcripcion_Sin_Titulo';
+        const filename = generateFilename(meetingTitle);
 
         const downloadData = {
             metadata: {
-                projectName: projectName,
+                title: response.title,
                 exportDate: new Date().toISOString(),
                 source: response.source,
-                title: response.title,
                 meetingDate: response.meetingDate,
                 totalEntries: response.entries.length,
                 speakers: response.speakers,
@@ -139,19 +123,29 @@ document.addEventListener('DOMContentLoaded', () => {
             url.includes('teams.microsoft.com');
     }
 
-    function generateFilename(projectName) {
+    function generateFilename(title) {
         const now = new Date();
         const year = String(now.getFullYear()).slice(-2);
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
 
-        const sanitizedName = projectName
-            .toUpperCase()
-            .replace(/[^A-Z0-9_]/g, '_')
-            .replace(/_+/g, '_')
-            .replace(/^_|_$/g, '');
+        // Sanitize title: remove extension if any (.mp4), remove invalid chars
+        let safeTitle = title.replace(/\.[^/.]+$/, ""); // Remove extension
+        safeTitle = safeTitle
+            .replace(/Transcripci[oó]n/gi, '') // Remove redundant "transcripcion"
+            .replace(/Grabaci[oó]n/gi, '') // Remove redundant "grabacion"
+            .trim();
 
-        return `${year}${month}${day}_${sanitizedName}_Transcripcion.json`;
+        safeTitle = safeTitle
+            .replace(/[^a-zA-Z0-9\u00C0-\u00FF \-_]/g, '') // Keep spaces for now
+            .trim()
+            .replace(/\s+/g, '_') // Space to underscore
+            .toUpperCase();
+
+        if (safeTitle.length > 50) safeTitle = safeTitle.substring(0, 50);
+        if (!safeTitle) safeTitle = "REUNION";
+
+        return `${year}${month}${day}_${safeTitle}_Transcripcion.json`;
     }
 
     function downloadJSON(data, filename) {
